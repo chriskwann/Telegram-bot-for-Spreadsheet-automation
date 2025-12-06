@@ -1,0 +1,602 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -864,
+        1232
+      ],
+      "id": "eb4b130f-1366-4467-b3c0-15200270a111",
+      "name": "Telegram Trigger",
+      "webhookId": "ed1e7b5b-9e79-4dd6-a631-f17df0bf7791",
+      "credentials": {
+        "telegramApi": {
+          "id": "LwVh2T5yET8wFpDd",
+          "name": "VimigoBot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "//CONFIG: column names\nconst COL_COMPANY     = 'Company Name';\nconst COL_TOTALSPENT  = 'Total Spent (RM)';\nconst COL_INDUSTRY    = 'Industry';\nconst COL_YEARS       = 'Years in Operation';\nconst COL_STAFF       = 'Total Staff';\n\n//INPUT\nconst rows     = items.map(i => i.json);\nconst question = $node[\"Telegram Trigger\"].json.message.text.toLowerCase();\nconst chatId   = $node[\"Telegram Trigger\"].json.message.chat.id;\n\nconst toNum = (v) => Number(String(v).replace(/,/g, '') || 0);\n\n//CASE A for Which company spent the most?\nif (question.includes(\"spent the most\")) {\n\n  let maxRow = rows[0];\n  for (const r of rows) {\n    if (toNum(r[COL_TOTALSPENT]) > toNum(maxRow[COL_TOTALSPENT])) {\n      maxRow = r;\n    }\n  }\n\n  return [{\n    json: {\n      action: \"reply\",\n      reply: `The company that spent the most is ${maxRow[COL_COMPANY]} with RM ${maxRow[COL_TOTALSPENT]}.`,\n      chatId\n    }\n  }];\n}\n\n\n//Case B for What's the average total spent?\nif (question.includes(\"average\") && question.includes(\"total\")) {\n\n  const nums = rows.map(r => toNum(r[COL_TOTALSPENT]));\n  const avg  = nums.reduce((a, b) => a + b, 0) / nums.length;\n\n  return [{\n    json: {\n      action: \"reply\",\n      reply: `The average total spent is RM ${avg.toFixed(2)}.`,\n      chatId\n    }\n  }];\n}\n\n//CaseD to update bailey operation year\nif (\n  question.includes(\"update\") &&\n  question.includes(\"bailey\") &&\n  question.includes(\"years\")\n) {\n    // find exact company name\n    let company = null;\n    for (let row of rows) {\n        if (String(row[COL_COMPANY]).toLowerCase().includes(\"bailey\")) {\n            company = row[COL_COMPANY];\n            break;\n        }\n    }\n\n    if (!company) {\n        return [{\n          json: { action: \"reply\", reply: \"Bailey Ltd was not found.\", chatId }\n        }];\n    }\n\n    return [{\n        json: {\n            action: \"update-bailey\",\n            company,                 // We update by company name\n            newValues: { [COL_YEARS]: \"20\" },\n            reply: \"Bailey Ltd has been updated to 20 years.\",\n            chatId\n        }\n    }];\n}\n\n\n\n//CaseE to update staff number more than 100 to 200\nif (\n  question.includes(\"update\") &&\n  question.includes(\"staff\") &&\n  question.includes(\"100\")\n) {\n\n  let updates = [];\n\n  // Build update list\n  for (let i = 0; i < rows.length; i++) {\n    const staff = toNum(rows[i][COL_STAFF]);\n    if (staff > 100) {\n      updates.push({\n        row_number: i + 2,\n        newValues: { [COL_STAFF]: \"200\" }\n      });\n    }\n  }\n\n  if (updates.length === 0) {\n    reply = \"No companies have more than 100 staff.\";\n    return [{ json: { action: \"reply\", reply, chatId } }];\n  }\n\n  // RETURN ONLY ONE ITEM\n  return [{\n    json: {\n      action: \"update-staff\",\n      updates,     // array of updates sent as ONE item\n      reply: `Updated ${updates.length} companies to 200 staff.`,\n      chatId\n    }\n  }];\n}\n\n//caseC to find out how many comapnies in a single category and their total spend\nconst industries = [\n    \"construction\",\"technology\",\"healthcare\",\"hospitality\",\"education\",\n    \"energy\",\"finance\",\"retail\",\"manufacturing\",\"transportation\"\n];\n\nlet industry = industries.find(i => question.includes(i));\n\nif (industry) {\n    const filtered = rows.filter(r =>\n        String(r[COL_INDUSTRY]).toLowerCase() === industry\n    );\n    const count = filtered.length;\n    const total = filtered.reduce((a,r)=>a+toNum(r[COL_TOTALSPENT]),0);\n\n    return [{\n      json: {\n        action: \"reply\",\n        reply: `There are ${count} ${industry} companies with total spend RM ${total.toFixed(2)}.`,\n        chatId\n      }\n    }];\n}\n\n//output for default function\nreturn {\n  json: {\n    action: \"update-bailey\",\n    company: \"Bailey Ltd\",\n    newValues: { \"Years in Operation\": \"20\" },\n    reply: \"Bailey Ltd has been updated to 20 years.\",\n    chatId\n  }\n};\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        1232
+      ],
+      "id": "9770f35e-cae7-4dc3-96f2-3798442a0e20",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "chatId": "7390635569",
+        "text": "={{ $('Code in JavaScript').first().json.reply }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        1232
+      ],
+      "id": "9921d61d-e437-4796-9a94-1dd48b37c86c",
+      "name": "Send a text message",
+      "webhookId": "6894892d-c834-4adc-ad90-29992042b432",
+      "credentials": {
+        "telegramApi": {
+          "id": "LwVh2T5yET8wFpDd",
+          "name": "VimigoBot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU",
+          "mode": "list",
+          "cachedResultName": "MyCopy of Customer List Example for AI Assessment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Years in Operation": "20",
+            "Company Name": "Bailey Ltd"
+          },
+          "matchingColumns": [
+            "Company Name"
+          ],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Years in Operation",
+              "displayName": "Years in Operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "City",
+              "displayName": "City",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Total Spent (RM)",
+              "displayName": "Total Spent (RM)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Signup Date",
+              "displayName": "Signup Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Industry",
+              "displayName": "Industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Total Staff",
+              "displayName": "Total Staff",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        704,
+        1088
+      ],
+      "id": "f9e5eecf-7c57-4ee3-8528-a291f0a4bec3",
+      "name": "Update row in sheet",
+      "executeOnce": false,
+      "retryOnFail": false,
+      "alwaysOutputData": false,
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "OWv8WWqqplkRFhTH",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU",
+          "mode": "list",
+          "cachedResultName": "MyCopy of Customer List Example for AI Assessment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -640,
+        1232
+      ],
+      "id": "c6f707be-009e-4b21-88cb-d9531410c75e",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "OWv8WWqqplkRFhTH",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ac02d494-b4f1-464d-a355-fb6d95b67847",
+              "leftValue": "=={{ $json.action }}\n",
+              "rightValue": "update-bailey",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -192,
+        1232
+      ],
+      "id": "f584504a-ffad-4c8e-a84c-c8128811e872",
+      "name": "If",
+      "retryOnFail": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9be775c5-ad8f-401d-a486-9dcaf626891e",
+              "leftValue": "={{ $json.action }}\n",
+              "rightValue": "update-staff",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        32,
+        1312
+      ],
+      "id": "55e4ae83-8616-47a9-932b-a2fe52c7a1bc",
+      "name": "If1",
+      "alwaysOutputData": false,
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU",
+          "mode": "list",
+          "cachedResultName": "MyCopy of Customer List Example for AI Assessment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GEBecXBVc4aQ0Uc8Z4lTaGBnau-SqonH3UTURRJlgsU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Total Staff": "={{ $json.newValues['Total Staff'] }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Years in Operation",
+              "displayName": "Years in Operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "City",
+              "displayName": "City",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Total Spent (RM)",
+              "displayName": "Total Spent (RM)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Signup Date",
+              "displayName": "Signup Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Industry",
+              "displayName": "Industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Total Staff",
+              "displayName": "Total Staff",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        480,
+        1376
+      ],
+      "id": "e6f145b7-afd1-48d6-95be-73cc988212bb",
+      "name": "Update row in sheet1",
+      "retryOnFail": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "OWv8WWqqplkRFhTH",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const updates = $input.first().json.updates;\nconst chatId = $input.first().json.chatId;\nconst reply = $input.first().json.reply;\n\nreturn updates.map(update => ({\n  json: {\n    row_number: update.row_number,\n    newValues: update.newValues,\n    chatId: chatId,\n    reply: reply\n  }\n}));"
+      },
+      "id": "62974bba-bee7-4d45-b94c-1f4131803537",
+      "name": "Split Updates Array",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        1376
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "981a0724-dab7-41e3-8af3-874673e7cd5a",
+      "name": "Aggregate Updates",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        704,
+        1376
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Split Updates Array",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Updates Array": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Updates": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3f3e72d3-f1c8-49d3-a3df-44764052239c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d88ea82493f347cad181fa4c453b209618e1077a523680b45a166aeb8c3d79c1"
+  },
+  "id": "d1H1hZ8UiuXAk5ax",
+  "tags": []
+}
